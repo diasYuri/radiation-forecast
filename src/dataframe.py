@@ -32,6 +32,19 @@ def windowing(dataframe, step_back, step_front) -> (np.array, np.array):
 
     return np.array(x), np.array(y)
 
+def windowing(dataframe, predict_column, step_back, step_front) -> (np.array, np.array):
+    dataset = dataframe.values
+    dataset_pred = dataframe[predict_column].values
+
+    x, y = [], []
+    for i in range(len(dataset) - step_back - step_front):
+        j = (i + step_back)
+        x.append(dataset[i:j])
+        y.append(dataset_pred[j:(j+step_front)])
+
+    return np.array(x), np.array(y)
+
+
 
 def split_data(x, y, length, ratio=0.8):
     train_size = int(length * 0.9)
