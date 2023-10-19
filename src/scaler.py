@@ -24,3 +24,6 @@ class Scaler:
             self.df_scaled[c] = self.scales[c] \
                 .fit_transform(self.df_scaled[c].values.reshape(-1, 1))
         return self.df_scaled
+    
+    def get_scaler_default(self):
+        return self.df_scaled.first()

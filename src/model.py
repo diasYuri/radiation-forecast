@@ -20,6 +20,7 @@ def build_model(hp):
                                        max_value=512,
                                        step=32),
                           return_sequences=True,
+                          activation=hp.Choice('activation_1', ['relu', 'sigmoid']),
                           input_shape=(5, 3)))
     model.add(layers.Dropout(rate=hp.Float(
         'dropout',
@@ -31,8 +32,9 @@ def build_model(hp):
     model.add(layers.LSTM(units=hp.Int('units_2',
                                        min_value=32,
                                        max_value=512,
-                                       step=32)))
-    model.add(layers.Dense(1, activation=hp.Choice('activation', ['relu', 'sigmoid'])))
+                                       step=32),
+                         activation=hp.Choice('activation_2', ['relu', 'sigmoid'])))
+    model.add(layers.Dense(1, activation=hp.Choice('activation_o', ['relu', 'sigmoid'])))
     model.compile(loss='mean_squared_error', optimizer=keras.optimizers.legacy.Adam(
         hp.Choice('learning_rate', [1e-2, 1e-3, 1e-4])))
     return model

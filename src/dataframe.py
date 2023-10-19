@@ -6,7 +6,6 @@ from sklearn.metrics import mean_squared_error
 from sklearn.metrics import r2_score
 from math import sqrt
 
-
 def read_data(filename='../data/daily_barbacena.csv'):
     df_temp = pd.read_csv(
         filename,
@@ -18,9 +17,40 @@ def read_data(filename='../data/daily_barbacena.csv'):
 
     df = df_temp[['RADIATION', 'TEMP', 'HUMIDITY_h']] \
         .resample('D') \
-        .agg({'RADIATION': np.sum, 'TEMP': np.mean, 'HUMIDITY_h': np.mean})
+        .agg({'RADIATION': 'sum', 'TEMP': 'mean', 'HUMIDITY_h': 'mean'})
 
     return df.loc[df.index >= init_index(df)].replace(0, np.nan)
+
+def read_data_from_csv(filename, fill=False) -> pd.DataFrame:
+    df = pd.read_csv(
+        filename,
+        sep=',',
+        parse_dates=['Timestamp'],
+        index_col=['Timestamp'])
+
+    df = df[['RADIATION', 'TEMP', 'HUMIDITY_h']]
+
+    dict_index = {}
+    df_temp = df.copy().resample('D').mean()
+    for c in df_temp:
+        dict_index[c] = df_temp[c].loc[np.isnan(df_temp[c].values)].index
+    
+    df = df.bfill()\
+        .resample('D') \
+        .agg({'RADIATION': 'sum', 'TEMP': 'mean', 'HUMIDITY_h': 'mean'})\
+        .replace(0, np.nan)
+
+    for c in df:
+        df[c].loc[dict_index[c]] = pd.NA
+
+    df = df.loc[df.index >= df[~df.RADIATION.isna()].index[0]]
+
+    if fill:
+        return df.interpolate(method='linear', limit_direction='backward')
+
+    return df
+    
+
 
 def windowing(dataframe, step_back, step_front) -> (np.array, np.array):
     dataset = dataframe.values
