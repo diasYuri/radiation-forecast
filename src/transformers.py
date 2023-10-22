@@ -72,8 +72,9 @@ class Transformer(nn.Module):
             nhead=nhead, 
             num_encoder_layers=num_encoder_layers,
             num_decoder_layers=num_decoder_layers, 
-            dim_feedforward=dim_feedforward, 
-            dropout=dropout)
+            dim_feedforward=dim_feedforward,
+            dropout=dropout,
+            activation=torch.tanh)
         self.fc = nn.Linear(d_model, 1)
 
     def forward(self, x):

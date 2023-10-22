@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from pydmd import DMD
+from pydmd import DMD, HODMD
 from sklearn.ensemble import RandomForestRegressor 
 import keras
 from keras.models import Sequential
@@ -359,3 +359,131 @@ class LstmFillerModel:
                     filling = False
                     fill_without_retrain = 0
         return dataserie_filled  
+
+
+class HodmdFiller:
+    def __init__(self, d_factor=0.9):
+        self.d_factor=d_factor
+
+    def __reconstruct_data(self, values, steps):
+        length = len(values)
+        #print(values.T.shape)
+        for v in values:
+            if pd.isna(v):
+                print(values.T)
+
+        hodmd = HODMD(
+                    svd_rank=0,
+                    tlsq_rank=0,
+                    exact=True,
+                    opt=True,
+                    forward_backward=True,
+                    sorted_eigs='abs',
+                    rescale_mode='auto',
+                    reconstruction_method="mean",
+                    d=int(length*self.d_factor)) \
+            .fit(values.T)
+
+        hodmd.original_time['tend'] = hodmd.dmd_time['tend'] = length-1
+        hodmd.dmd_time['tend'] = length+steps-1
+
+        return hodmd.reconstructed_data.T.real[length:]
+    
+    def __filler(self, values, empty_gaps):
+        data_filled = values
+
+        for i in range(len(empty_gaps)):
+            (idx_lower, idx_top) = empty_gaps[i]
+
+            if i > 0:
+                (_, last_idx) = empty_gaps[i - 1]
+            else:
+                last_idx = 0
+
+            steps = idx_top - idx_lower
+            data_input = values[last_idx:idx_lower]
+
+            if len(data_input) < 3 or steps > 15:
+                data_input = data_filled[0:idx_lower-1]
+
+            for v in data_input:
+                if pd.isna(v):
+                    print('dados restaurados:', data_input)
+
+            data = self.__reconstruct_data(data_input, steps)
+
+            #print('dados faltantes:', data_filled[idx_lower:idx_top+1])
+            #print('dados restaurados:', data)
+            #print(idx_lower, idx_top)
+            for j in range(idx_lower, idx_top):
+                data_filled[j] = data[j - idx_lower]
+
+
+        return data_filled           
+                    
+
+    def look_for_empty_gaps(self, values):
+        empty_spaces = []
+        init = None
+
+        for i, value in enumerate(values):
+            if pd.isna(value):
+                if init is None:
+                    init = i
+            else:
+                if init is not None:
+                    empty_spaces.append((init, i))
+                    init = None
+
+        if init is not None:
+            empty_spaces.append((init, len(values) - 1))
+
+        return empty_spaces
+    
+    def check_gap(self, idx, dict, list):
+        for e in list:
+            if idx >= e:
+                if idx <= dict[e]:
+                    return True    
+            else:
+                break
+        return False
+
+    
+    def check(self, values, empty_gaps):
+        dict = {}
+
+        for e in empty_gaps:
+            (init, end) = e
+            dict[init] = end
+
+        list = [i for (i, _) in empty_gaps]
+        list.sort()
+
+        for i, value in enumerate(values):
+            if pd.isna(value):
+                checked = self.check_gap(i, dict=dict, list=list)
+                if checked is False:
+                    print('Deu ruim:', i)
+
+
+
+    def dmd_filler(self,
+            serie: pd.Series,
+            debug: bool = False) -> pd.Series:
+        data = serie.copy()
+        values = data.values.reshape(-1,1)
+        index = data.index.values
+
+        print(values.shape)
+
+        empty_gaps = self.look_for_empty_gaps(values)
+        #print(empty_gaps)
+        self.check(data, empty_gaps)
+
+        data_filled = self.__filler(values, empty_gaps)
+
+        return pd.Series(data_filled.ravel(),
+                        index=index,
+                        name=data.name)
+    
