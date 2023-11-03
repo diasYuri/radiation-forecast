@@ -8,6 +8,7 @@ from keras.layers import LSTM
 from keras.layers import Bidirectional, Dropout, Activation, Dense, LSTM, InputLayer
 from keras.callbacks import EarlyStopping
 from sklearn.preprocessing import MinMaxScaler
+from statsmodels.tsa.seasonal import seasonal_decompose
 
 def fill_df(dataframe, filler):
     data = {}
@@ -20,7 +21,8 @@ def interpolate_filler(data):
     return data.interpolate(method='linear', limit_direction='backward')
 
 
-def dmd_filler(data: pd.Series):
+
+def deprecated_dmd_filler(data: pd.Series):
     column = data.name
     data = data.to_frame()
     filled_data = data.copy()
@@ -37,10 +39,26 @@ def dmd_filler(data: pd.Series):
 
     return filled_data[column]
 
+def seasonal_filler(df: pd.Series, period=365, factor=1):
+    data = df.copy()
+    data_temp = data
+    data_temp.fillna(method='ffill', inplace=True)
+    data_temp.fillna(method='bfill', inplace=True)
+
+    decomposition = seasonal_decompose(data_temp, period=period, model='additive', extrapolate_trend='freq')
+
+    seasonal_component = decomposition.seasonal
+    seasonal_component = abs(seasonal_component * factor)
+
+    data_interp = data
+    data_interp.loc[data.isna()] = seasonal_component.loc[data.isna()]
+
+    return data_interp
+
 
 class FillerHelper:
     @staticmethod
-    def get_largest_complete_interval(data: pd.Series) -> (int, int):
+    def get_largest_complete_interval(data: pd.Series):
         init, end = 0, 0
         largest_gap = 0
         temp_init = 0
@@ -86,6 +104,35 @@ class FillerHelper:
     def extract_largest_complete_interval(data):
         start, end, _ = FillerHelper.find_largest_complete_interval_final(data)
         return data.loc[start:end]
+    
+    @staticmethod
+    def introduce_gaps_dataframe(data, missing_percentage=0.1, random_seed=42, min_gap_size=5, max_gap_size=20):
+        np.random.seed(random_seed)
+        data_with_gaps = data.copy()
+
+        for column in data.columns:
+            num_missing = int(missing_percentage * len(data))
+            missing_indices = np.random.choice(len(data), size=num_missing, replace=False)
+
+            for idx in missing_indices:
+                gap_size = np.random.randint(min_gap_size, max_gap_size)
+                data_with_gaps[column].iloc[(int)(idx):(int)(idx+gap_size)] = pd.NA
+
+        return data_with_gaps
+    
+    @staticmethod
+    def introduce_gaps(data: pd.Series, missing_percentage=0.1, random_seed=42, min_gap_size=5, max_gap_size=20):
+        np.random.seed(random_seed)
+        data_with_gaps = data.copy()
+
+        num_missing = int(missing_percentage * len(data))
+        missing_indices = np.random.choice(len(data), size=num_missing, replace=False)
+
+        for idx in missing_indices:
+            gap_size = np.random.randint(min_gap_size, max_gap_size)
+            data_with_gaps.iloc[(int)(idx):(int)(idx+gap_size)] = pd.NA
+
+        return data_with_gaps
 
 class Debbuger:
     @staticmethod
@@ -392,7 +439,9 @@ class HodmdFiller:
     def __filler(self, values, empty_gaps):
         data_filled = values
 
-        for i in range(len(empty_gaps)):
+        length_gaps = len(empty_gaps)
+
+        for i in range(length_gaps):
             (idx_lower, idx_top) = empty_gaps[i]
 
             if i > 0:
@@ -417,6 +466,8 @@ class HodmdFiller:
             #print(idx_lower, idx_top)
             for j in range(idx_lower, idx_top):
                 data_filled[j] = data[j - idx_lower]
+
+            print(f'Process in: {(i/length_gaps)*100}%')
 
 
         return data_filled           
@@ -478,12 +529,14 @@ class HodmdFiller:
         print(values.shape)
 
         empty_gaps = self.look_for_empty_gaps(values)
-        #print(empty_gaps)
         self.check(data, empty_gaps)
 
         data_filled = self.__filler(values, empty_gaps)
 
-        return pd.Series(data_filled.ravel(),
+        serie_filled = pd.Series(data_filled.ravel(),
                         index=index,
                         name=data.name)
-    
+        serie_filled.ffill(inplace=True)
+        print('DMDFiller -> Dados Faltantes:', serie_filled.isna().sum())
+        return serie_filled
+
