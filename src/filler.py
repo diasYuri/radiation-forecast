@@ -40,10 +40,11 @@ def deprecated_dmd_filler(data: pd.Series):
     return filled_data[column]
 
 def seasonal_filler(df: pd.Series, period=365, factor=1):
-    data = df.copy()
-    data_temp = data
-    data_temp.fillna(method='ffill', inplace=True)
-    data_temp.fillna(method='bfill', inplace=True)
+    data = df
+    data_temp = data.copy()
+    data_temp.interpolate(method='linear', limit_direction='backward', inplace=True)
+    data_temp.ffill(inplace=True)
+    data_temp.bfill(inplace=True)
 
     decomposition = seasonal_decompose(data_temp, period=period, model='additive', extrapolate_trend='freq')
 
@@ -51,6 +52,7 @@ def seasonal_filler(df: pd.Series, period=365, factor=1):
     seasonal_component = abs(seasonal_component * factor)
 
     data_interp = data
+    print(df.isna().sum())
     data_interp.loc[data.isna()] = seasonal_component.loc[data.isna()]
 
     return data_interp
@@ -414,7 +416,6 @@ class HodmdFiller:
 
     def __reconstruct_data(self, values, steps):
         length = len(values)
-        #print(values.T.shape)
         for v in values:
             if pd.isna(v):
                 print(values.T)
@@ -461,13 +462,10 @@ class HodmdFiller:
 
             data = self.__reconstruct_data(data_input, steps)
 
-            #print('dados faltantes:', data_filled[idx_lower:idx_top+1])
-            #print('dados restaurados:', data)
-            #print(idx_lower, idx_top)
             for j in range(idx_lower, idx_top):
                 data_filled[j] = data[j - idx_lower]
 
-            print(f'Process in: {(i/length_gaps)*100}%')
+            #print(f'Process in: {(i/length_gaps)*100}%')
 
 
         return data_filled           
@@ -539,4 +537,3 @@ class HodmdFiller:
         serie_filled.ffill(inplace=True)
         print('DMDFiller -> Dados Faltantes:', serie_filled.isna().sum())
         return serie_filled
-

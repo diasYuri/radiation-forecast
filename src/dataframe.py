@@ -50,7 +50,14 @@ def read_data_from_csv(filename, fill=False) -> pd.DataFrame:
 
     return df
     
+def windowing_nparray(values, step_back, step_front) -> (np.array, np.array):
+    x, y = [], []
+    for i in range(len(values) - step_back - step_front):
+        j = (i + step_back)
+        x.append(values[i:j])
+        y.append(values[j:(j+step_front), 0])
 
+    return np.array(x), np.array(y)
 
 def windowing(dataframe, step_back, step_front) -> (np.array, np.array):
     dataset = dataframe.values
