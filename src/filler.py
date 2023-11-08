@@ -225,15 +225,15 @@ class RandomForestFillerWithOneModel:
     model: RandomForestRegressor
     n_in: int = 5
     n_out: int = 1
-    is_debug: bool = False
     random_state: int = 97423897
 
-    def __init__(self, n_estimators, n_in=5, n_out=1, history_length=200, fill_without_retrain=30):
+    def __init__(self, n_estimators, n_in=5, n_out=1, history_length=200, fill_without_retrain=30, is_debug=False):
         self.n_estimators = n_estimators
         self.n_in = n_in
         self.n_out = n_out
         self.history_length = history_length
-        self.fill_without_retrain = fill_without_retrain
+        self.fill_without_retrain = fill_without_retrain,
+        self.is_debug = is_debug
 
     def __windowing(self, values, step_back, step_front):
         x, y = [], []

@@ -35,7 +35,7 @@ def read_data_from_csv(filename, fill=False) -> pd.DataFrame:
     for c in df_temp:
         dict_index[c] = df_temp[c].loc[np.isnan(df_temp[c].values)].index
     
-    df = df.bfill()\
+    df = df.ffill()\
         .resample('D') \
         .agg({'RADIATION': 'sum', 'TEMP': 'mean', 'HUMIDITY_h': 'mean'})\
         .replace(0, np.nan)
